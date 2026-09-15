@@ -16,7 +16,25 @@ client = genai.Client()
 tax_year = st.selectbox("請選擇財稅調閱年份：", ["113", "112", "114", "111"], index=0)
 
 # 3. 照片上傳區（修正了原本缺少的右括號）
-uploaded_files = st.file_uploader(
+uploaded_files = st.file_uploader(import streamlit as st
+from google import genai
+from PIL import Image
+
+# ... 前面程式碼保持不變 ...
+
+if uploaded_files:
+    # 1. 將上傳的檔案轉為 PIL Image 物件（避免字串/位元組編碼問題）
+    images = [Image.open(f) for f in uploaded_files]
+    
+    if st.button("🚀 產出審查報告"):
+        prompt = "請詳細辨識此財稅照片內容並產出審查報告..."
+        
+        # 2. 直接傳入 prompt 與 PIL 圖片物件
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[prompt, *images]
+        )
+        st.write(response.text)
     "請上傳財稅查調清單照片（支援 JPG / PNG）", 
     type=["jpg", "jpeg", "png"],
     accept_multiple_files=True
