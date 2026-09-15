@@ -1,91 +1,73 @@
 import streamlit as st
+from google import genai
+from google.genai import types
+from PIL import Image
 
-# 頁面標題
+# 1. 頁面標題與設定
+st.set_page_config(page_title="個案財稅自動辨識系統", layout="wide")
 st.title("📄 個案財稅自動辨識與詳細審查系統")
 st.caption("上傳財稅查調照片後，自動排版產出標準社工審查紀錄。")
 
-# 選擇財稅年份
+# 設定 API Key（建議將 Key 設定在 Streamlit Secrets 或環境變數中）
+# 若是在本地端測試，可直接貼上你的 API Key，例如: client = genai.Client(api_key="YOUR_API_KEY")
+client = genai.Client()
+
+# 2. 選擇財稅年份
 tax_year = st.selectbox("請選擇財稅調閱年份：", ["113", "112", "114", "111"], index=0)
 
-# 照片上傳區
+# 3. 照片上傳區（修正了原本缺少的右括號）
 uploaded_files = st.file_uploader(
     "請上傳財稅查調清單照片（支援 JPG / PNG）", 
     type=["jpg", "jpeg", "png"],
     accept_multiple_files=True
 )
 
-# 預設審查文本資料
-DEFAULT_RECORDS = [
-    {
-        "title": "1.案主（張智傑）",
-        "items": [
-            "(1)軍保（國軍臺北財務組在保中，90/08/06加保）。",
-            "(2)國軍軍職薪資所得共 936,667 元(一年)，每月薪資約 78,056 元。",
-            "(3)郵局/合作金庫存款及利息所得 37,531 元，存款總額約 2,212,913 元。",
-            "(4)無登記不動產與車輛。"
-        ]
-    },
-    {
-        "title": "2.案母（陳欣萍）",
-        "items": [
-            "(1)職保（苗栗縣汽車修理業職業工會，投保 27,470 元/月）。",
-            "(2)查無薪資所得。",
-            "(3)利息/股利所得共 110,396 元，存款與股票投資總額約 5,849,890 元。",
-            "(4)名下持有頭份市房屋及土地，評定現值共 4,393,400 元。",
-            "(5)車輛登記 2 輛（國瑞 1798cc / 1497cc）。"
-        ]
-    },
-    {
-        "title": "3.案妻/家属（陳曉佩）",
-        "items": [
-            "(1)職保（金門區漁會，投保 27,470 元/月）。",
-            "(2)金門金湖國中等單位薪資所得共 93,345 元(一年)，每月薪資約 7,779 元。",
-            "(3)中獎與利息所得共 64,514 元，金門地合社與土銀存款/投資共 560,660 元。",
-            "(4)車輛登記 1 輛（MAZDA 1999cc）。"
-        ]
-    },
-    {
-        "title": "4.案兄（張智銘）",
-        "items": [
-            "(1)職保（金門縣營造業職業工會，投保 27,470 元/月；軍保已退保）。",
-            "(2)良福保全與易陽營造薪資所得共 35,392 元(一年)，每月薪資約 2,949 元。",
-            "(3)查無存款、投資與不動產登記。"
-        ]
-    },
-    {
-        "title": "5.案父（張許宏）",
-        "items": [
-            "(1)職保（苗栗縣汽車修理業職業工會，投保 27,470 元/月）。",
-            "(2)查無財稅申報資料與名下財產。"
-        ]
-    },
-    {
-        "title": "6.其他未成年家屬（張右昀等5人）",
-        "items": [
-            "(1)張右昀有行天宮其他所得 5,000 元。",
-            "(2)其餘未成年家屬無所得、無投保、無財產登記。"
-        ]
-    }
-]
-
-def generate_report(year):
-    lines = [f"經查調{year}年財稅\n"]
-    for rec in DEFAULT_RECORDS:
-        lines.append(rec["title"])
-        for item in rec["items"]:
-            lines.append(f"  {item}")
-        lines.append("")
-    lines.append("【社工初審綜合評估結論】")
-    lines.append("全戶年總所得達 1,282,845 元（平均月收入約 10.6 萬元），金融動產與不動產價值高達 1,300 萬元以上。整體經濟狀況充裕，不符合低收入戶、中低收入戶及急難救助等社會福利補助資格。")
-    return "\n".join(lines)
-
-# 照片顯示與解析按鈕
+# 4. 照片顯示與辨識解析
 if uploaded_files:
     st.write(f"📸 已選擇 {len(uploaded_files)} 張照片")
-    for f in uploaded_files:
-        st.image(f, caption=f.name, width=300)
-        
-    if st.button("🚀 產出審查報告"):
-        report_text = generate_report(tax_year)
-        st.success("解析完成！")
-        st.text_area("詳細審查紀錄：", value=report_text, height=400)
+    
+    # 顯示上傳的照片縮圖
+    cols = st.columns(min(len(uploaded_files), 4))
+    images = []
+    for idx, f in enumerate(uploaded_files):
+        img = Image.open(f)
+        images.append(img)
+        with cols[idx % 4]:
+            st.image(img, caption=f.name, use_container_width=True)
+            
+    if st.button("🚀 開始辨識照片並產出審查報告", type="primary"):
+        with st.spinner("AI 正在辨識財稅照片內容並生成報告，請稍候..."):
+            try:
+                # 建立給 AI 的提示詞（Prompt）
+                prompt = f"""
+                你是一位專業的社會工作師，請幫忙分析上傳的{tax_year}年度財稅查調清單照片。
+                
+                請按照以下格式輸出標準的「個案財稅詳細審查紀錄」：
+                
+                經查調{tax_year}年財稅：
+                
+                【一、財稅細項列出】
+                請仔細辨識照片中的每一位案主/家屬姓名、身分證字號或稱謂，並依序列出其：
+                1. 投保/勞健保資訊（例如加保單位、日期）
+                2. 所得明細（例如薪資所得、股利所得、營利所得等，含金額與單位）
+                3. 金融動產（例如郵局/銀行存款、存款利息等，含金額）
+                4. 不動產與車輛（例如土地、房屋、汽車等公告現值或登記狀況）
+                
+                【二、社工初審綜合評估結論】
+                根據上述辨識出的實際數據，進行以下評估：
+                1. 計算全戶年總所得與平均月收入。
+                2. 統計金融動產與不動產總估值。
+                3. 評估其整體經濟狀況，並說明是否符合低收入戶、中低收入戶或急難救助等社會福利補助資格建議。
+                """
+
+                # 呼叫 Gemini Vision 模型辨識圖片與文字
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=[prompt, *images]
+                )
+
+                st.success("解析完成！")
+                st.text_area("詳細審查紀錄（可直接複製）：", value=response.text, height=500)
+
+            except Exception as e:
+                st.error(f"辨識失敗，請確認 API 設定或圖片清晰度。錯誤訊息: {e}")
