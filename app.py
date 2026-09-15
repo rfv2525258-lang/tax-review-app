@@ -1,6 +1,5 @@
 import streamlit as st
 from google import genai
-from google.genai import types
 from PIL import Image
 
 # 1. 頁面標題與設定
@@ -8,50 +7,35 @@ st.set_page_config(page_title="個案財稅自動辨識系統", layout="wide")
 st.title("📄 個案財稅自動辨識與詳細審查系統")
 st.caption("上傳財稅查調照片後，自動排版產出標準社工審查紀錄。")
 
-# 設定 API Key（建議將 Key 設定在 Streamlit Secrets 或環境變數中）
-# 若是在本地端測試，可直接貼上你的 API Key，例如: client = genai.Client(api_key="YOUR_API_KEY")
-client = genai.Client()
+# 2. 設定 Gemini API Key
+api_key = st.secrets.get("GEMINI_API_KEY")
+if api_key:
+    client = genai.Client(api_key=api_key)
+else:
+    client = genai.Client()
 
-# 2. 選擇財稅年份
+# 3. 選擇財稅年份
 tax_year = st.selectbox("請選擇財稅調閱年份：", ["113", "112", "114", "111"], index=0)
 
-# 3. 照片上傳區（修正了原本缺少的右括號）
-uploaded_files = st.file_uploader(import streamlit as st
-from google import genai
-from PIL import Image
-
-# ... 前面程式碼保持不變 ...
-
-if uploaded_files:
-    # 1. 將上傳的檔案轉為 PIL Image 物件（避免字串/位元組編碼問題）
-    images = [Image.open(f) for f in uploaded_files]
-    
-    if st.button("🚀 產出審查報告"):
-        prompt = "請詳細辨識此財稅照片內容並產出審查報告..."
-        
-        # 2. 直接傳入 prompt 與 PIL 圖片物件
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=[prompt, *images]
-        )
-        st.write(response.text)
+# 4. 照片上傳區
+uploaded_files = st.file_uploader(
     "請上傳財稅查調清單照片（支援 JPG / PNG）", 
     type=["jpg", "jpeg", "png"],
     accept_multiple_files=True
 )
 
-# 4. 照片顯示與辨識解析
+# 5. 照片顯示與辨識解析
 if uploaded_files:
     st.write(f"📸 已選擇 {len(uploaded_files)} 張照片")
     
+    # 讀取 PIL Image 物件以供顯示與模型輸入
+    images = [Image.open(f) for f in uploaded_files]
+    
     # 顯示上傳的照片縮圖
-    cols = st.columns(min(len(uploaded_files), 4))
-    images = []
-    for idx, f in enumerate(uploaded_files):
-        img = Image.open(f)
-        images.append(img)
+    cols = st.columns(min(len(images), 4))
+    for idx, img in enumerate(images):
         with cols[idx % 4]:
-            st.image(img, caption=f.name, use_container_width=True)
+            st.image(img, caption=uploaded_files[idx].name, use_container_width=True)
             
     if st.button("🚀 開始辨識照片並產出審查報告", type="primary"):
         with st.spinner("AI 正在辨識財稅照片內容並生成報告，請稍候..."):
@@ -78,7 +62,7 @@ if uploaded_files:
                 3. 評估其整體經濟狀況，並說明是否符合低收入戶、中低收入戶或急難救助等社會福利補助資格建議。
                 """
 
-                # 呼叫 Gemini Vision 模型辨識圖片與文字
+                # 呼叫 Gemini Vision 模型，傳入提示詞與 PIL 圖片物件
                 response = client.models.generate_content(
                     model="gemini-2.5-flash",
                     contents=[prompt, *images]
