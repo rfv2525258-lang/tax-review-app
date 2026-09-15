@@ -61,12 +61,28 @@ if uploaded_files:
                 2. 統計金融動產與不動產總估值。
                 3. 評估其整體經濟狀況，並說明是否符合低收入戶、中低收入戶或急難救助等社會福利補助資格建議。
                 """
+# 1. 將提示詞手動編碼為 UTF-8 位元組串，再解碼為純 Unicode 字串
+# 這能強制將任何潛在的編碼岐義轉化為乾淨的 utf-8 字串物件
+clean_prompt = prompt.encode("utf-8").decode("utf-8")
 
-                # 呼叫 Gemini Vision 模型，傳入提示詞與 PIL 圖片物件
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=[prompt, *images]
-                )
+# 2. 為了更保險，我們使用 types 物件來明確定義 Parts (文字 Part 與 圖片 Part)
+# 這比單純傳送陣列更穩健
+try:
+    # 建立正式的 contents 物件，確保文字 Part 的編碼正確
+    contents_body = types.Content(
+        parts=[types.Part.from_text(text=clean_prompt)] # 明確指定文字 part
+    )
+    
+    # 將圖片 Part 加入 contents_body
+    for img in images:
+        contents_body.parts.append(types.Part.from_image(img)) # 明確指定圖片 part
+
+    # 3. 呼叫 API，傳送這個正式建立的 contents_body 物件
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=contents_body # 這裡改用 structured 的 contents 物件
+    )
+               
 
                 st.success("解析完成！")
                 st.text_area("詳細審查紀錄（可直接複製）：", value=response.text, height=500)
