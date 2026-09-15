@@ -80,7 +80,7 @@ if uploaded_files:
 
                 # 呼叫 Gemini Vision 模型
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                   model="gemini-3.6-flash",
                     contents=types.Content(parts=parts)
                 )
 
