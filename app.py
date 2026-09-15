@@ -1,3 +1,4 @@
+import io
 import streamlit as st
 from google import genai
 from google.genai import types
@@ -29,20 +30,20 @@ uploaded_files = st.file_uploader(
 if uploaded_files:
     st.write(f"📸 已選擇 {len(uploaded_files)} 張照片")
     
-    # 讀取 PIL Image 物件以供顯示與模型輸入
+    # 讀取 PIL Image 物件供預覽
     images = [Image.open(f) for f in uploaded_files]
     
     # 顯示上傳的照片縮圖
     cols = st.columns(min(len(images), 4))
     for idx, img in enumerate(images):
         with cols[idx % 4]:
-            st.image(img, caption=uploaded_files[idx].name, use_container_width=True)
+            st.image(img, caption=f"照片 {idx+1}", use_container_width=True)
             
     if st.button("🚀 開始辨識照片並產出審查報告", type="primary"):
         with st.spinner("AI 正在辨識財稅照片內容並生成報告，請稍候..."):
             try:
                 # 建立給 AI 的提示詞（Prompt）
-                prompt = f"""
+                prompt_text = f"""
 你是一位專業的社會工作師，請幫忙分析上傳的{tax_year}年度財稅查調清單照片。
 
 請按照以下格式輸出標準的「個案財稅詳細審查紀錄」：
@@ -63,13 +64,24 @@ if uploaded_files:
 3. 評估其整體經濟狀況，並說明是否符合低收入戶、中低收入戶或急難救助等社會福利補助資格建議。
 """
 
-                # 組合傳送內容（提示詞 + 所有圖片）
-                contents_list = [prompt] + images
+                # 建立安全且明確編碼的內容清單
+                parts = [types.Part.from_text(text=prompt_text)]
+
+                # 將每張圖片轉成純 byte 格式傳送，徹底防止檔名/路徑引起的 ASCII 編碼問題
+                for uploaded_file in uploaded_files:
+                    img_bytes = uploaded_file.getvalue()
+                    mime_type = uploaded_file.type or "image/jpeg"
+                    parts.append(
+                        types.Part.from_bytes(
+                            data=img_bytes,
+                            mime_type=mime_type
+                        )
+                    )
 
                 # 呼叫 Gemini Vision 模型
                 response = client.models.generate_content(
                     model="gemini-2.5-flash",
-                    contents=contents_list
+                    contents=types.Content(parts=parts)
                 )
 
                 st.success("解析完成！")
