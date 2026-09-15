@@ -1,2 +1,4 @@
+
 streamlit
-google-genai 與 pillow
+google-genai
+pillow
